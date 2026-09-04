@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+title: "Sinon: an AI agent pentest kit"
+message: "If you use Sinon in research or in a published assessment, please cite it."
+type: software
+authors:
+  - alias: at0m-b0mb
+    name: at0m-b0mb
+repository-code: "https://github.com/at0m-b0mb/Sinon"
+url: "https://at0m-b0mb.github.io/Sinon/"
+abstract: >-
+  Sinon is a methodology and test corpus for assessing LLM agents against prompt
+  injection, tool abuse and over-permissioned actions. Verdicts rest on observed
+  facts --- unique canaries returned by the agent, instrumented tool calls, and
+  requests arriving at a loopback sink --- rather than on a judge model. Probes
+  that a target cannot answer are reported as skipped rather than passed, and
+  reduce a coverage-capped grade.
+keywords:
+  - security
+  - large language models
+  - agents
+  - prompt injection
+  - penetration testing
+  - OWASP LLM Top 10
+license: MIT
+version: 1.0.0
+date-released: "2026-09-04"

@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: tests (py${{ matrix.python }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        include:
+          - os: macos-latest
+            python: "3.12"
+          - os: windows-latest
+            python: "3.12"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      - name: Tests
+        run: python -m pytest -q
+
+  corpus:
+    name: corpus is valid and docs are current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+
+      - name: Validate the corpus (errors and warnings)
+        run: sinon validate --strict --no-color
+
+      - name: Generated docs are up to date
+        run: |
+          python3 scripts/gen_docs.py
+          if ! git diff --quiet; then
+            echo "::error::docs/ is stale. Run: python3 scripts/gen_docs.py"
+            git --no-pager diff --stat
+            exit 1
+          fi
+
+      - name: Brand assets are up to date
+        run: |
+          python3 scripts/gen_assets.py
+          if ! git diff --quiet; then
+            echo "::error::assets/brand is stale. Run: python3 scripts/gen_assets.py"
+            git --no-pager diff --stat
+            exit 1
+          fi
+
+  demo:
+    name: end-to-end demo and reports
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+
+      - name: The defence gradient holds
+        run: sinon demo --compare --no-color
+
+      - name: A weak agent is caught and the exit code says so
+        run: |
+          set +e
+          sinon demo --profile naive --quiet --no-color --out reports
+          code=$?
+          set -e
+          test "$code" -eq 1 || { echo "expected exit 1 for findings, got $code"; exit 1; }
+
+      - name: Every report format was written
+        run: |
+          ls reports/
+          for ext in html json md sarif; do
+            ls reports/*.$ext >/dev/null || { echo "missing .$ext report"; exit 1; }
+          done
+          python3 -c "import json,glob; json.load(open(glob.glob('reports/*.sarif')[0])); print('sarif parses')"
+          python3 -c "import json,glob; d=json.load(open(glob.glob('reports/*.json')[0])); print('grade', d['score']['grade'])"
+
+      - name: The gate refuses an unauthorized remote target
+        run: |
+          set +e
+          sinon run --target http --target-url https://example.com/chat --no-color
+          code=$?
+          set -e
+          test "$code" -eq 2 || { echo "expected exit 2 from the authorization gate, got $code"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sinon-demo-report
+          path: reports/
+
+  package:
+    name: package builds and installs clean
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      - name: Install the wheel in a clean environment and use it
+        run: |
+          python -m venv /tmp/fresh
+          /tmp/fresh/bin/pip install dist/*.whl
+          /tmp/fresh/bin/sinon --version
+          # The corpus must ship inside the wheel, not just in the repo.
+          cd /tmp && /tmp/fresh/bin/sinon list --stats
+          cd /tmp && /tmp/fresh/bin/sinon demo --quiet --no-color --fail-on none
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/

@@ -1,0 +1,44 @@
+# A filled-in engagement file, for reference.
+#
+# Sinon refuses any non-local target without one of these. Copy it with
+# `sinon init --engagement engagement.yaml` and fill it in from the signed rules
+# of engagement, not from memory --- these fields end up verbatim in the report
+# you hand back to the client.
+
+engagement:
+  client: "Northwind Logistics"
+  authorized_by: "J. Vance, Chief Information Security Officer"
+  authorization_ref: "PO-2026-1183 / RoE signed 2026-09-01"
+  contact: "soc@northwind-example.com, +44 20 7946 0000 (24h during window)"
+  window:
+    start: 2026-09-02          # inclusive
+    end: 2026-09-09            # inclusive; runs outside this are refused
+  notes: |
+    Scope limited to the customer-support agent in the staging environment.
+    Staging is seeded with synthetic customer records only.
+    The agent's send_email tool is wired to a null sink in staging; confirmed
+    with the platform team on 2026-08-28.
+    Escalation: page the SOC number above and stop the run.
+
+scope:
+  allow_hosts:
+    - agent-staging.northwind-example.com
+  deny_hosts:
+    - agent.northwind-example.com     # production, explicitly out of scope
+
+target:
+  # Keeping the target next to its authorization means a run is one flag:
+  #   sinon run --engagement examples/engagement.yaml --out ./reports
+  kind: http
+  name: "support-agent-v3 (staging)"
+  url: "https://agent-staging.northwind-example.com/api/assistant"
+  prompt_field: "input.message"
+  response_path: "data.reply.text"
+  tool_calls_path: "data.trace.actions"
+  headers:
+    Authorization: "Bearer ${AGENT_TOKEN}"   # expanded from the environment
+
+options:
+  identify_requests: true      # X-Sinon-Run headers and SINON- canaries
+  rate_limit_per_min: 30       # sharing capacity with QA
+  timeout_seconds: 60

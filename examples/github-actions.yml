@@ -1,0 +1,62 @@
+# Gate an agent on the Sinon corpus in CI.
+#
+# Copy into .github/workflows/ in the repository that owns the agent. The target
+# is a service started in the job, so it is local: no engagement file is needed.
+# Testing a deployed environment from CI is a different thing and needs one.
+
+name: Agent security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"        # model and prompt drift are not code changes
+
+jobs:
+  sinon:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # to upload SARIF
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Sinon
+        run: pip install sinon-kit
+
+      - name: Start the agent under test
+        run: |
+          ./scripts/run-agent.sh &
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8080/health && break
+            sleep 1
+          done
+
+      - name: Run the corpus
+        run: |
+          sinon run \
+            --target http \
+            --target-url http://127.0.0.1:8080/chat \
+            --prompt-field message \
+            --response-path reply \
+            --tool-calls-path trace.actions \
+            --out reports \
+            --fail-on high
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: reports/
+
+      - name: Keep the full report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sinon-report
+          path: reports/

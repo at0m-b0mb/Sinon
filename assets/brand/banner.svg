@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360"
+     role="img" aria-label="Sinon --- AI agent pentest kit">
+  <rect width="1200" height="360" fill="#f7f4ee"/>
+  <rect x="0" y="356" width="1200" height="4" fill="#c2521f"/>
+  <g transform="translate(96 108) scale(2.2)">
+  <g fill="none" stroke="#c2521f" stroke-width="3.4" stroke-linecap="square">
+    <path d="M8 58 V30 A24 24 0 0 1 32 6 A24 24 0 0 1 56 30 V58"/>
+  </g>
+  <path fill="#101625" d="M25.5 9.5 l4.6 8.2 l3.2 -8.6 l5.9 10.4
+      l10.4 9.9 a2.4 2.4 0 0 1 0.5 2.7 l-2.1 4.3 l-7.7 -1.2 l-2.9 -2.7
+      l-3.6 5.6 l1.4 12.3 l3.4 4.4 l-19.8 0 l1.2 -10.6 l-5.7 -8.4
+      a3 3 0 0 1 -0.2 -3.2 l5.1 -8.6 z"/>
+  <g fill="none" stroke="#f7f4ee" stroke-width="1.6" opacity="0.55">
+    <path d="M20.8 27.4 L41.6 34.2"/>
+    <path d="M23.4 39.6 L38.9 41.1"/>
+  </g>
+</g>
+  <text x="272" y="168" font-family="Iowan Old Style, Palatino, Georgia, serif"
+        font-size="86" font-weight="600" letter-spacing="26" fill="#101625">SINON</text>
+  <text x="278" y="212" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif"
+        font-size="23" letter-spacing="5.5" fill="#5c6679">AI AGENT PENTEST KIT</text>
+  <text x="278" y="264" font-family="Iowan Old Style, Palatino, Georgia, serif"
+        font-size="27" font-style="italic" fill="#5c6679">&#8220;They opened the gates themselves.&#8221;</text>
+  <g stroke="#dcd7cc" stroke-width="2">
+    <path d="M278 288 H1104"/>
+  </g>
+  <text x="278" y="322" font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
+        font-size="21" fill="#c2521f">prompt injection &#183; tool abuse &#183; over-permissioned actions</text>
+</svg>

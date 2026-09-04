@@ -1,0 +1,81 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sinon-kit"
+dynamic = ["version"]
+description = "AI agent pentest kit: a methodology and test corpus for prompt injection, tool abuse and over-permissioned agent actions"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+authors = [{ name = "at0m-b0mb" }]
+keywords = [
+    "security", "pentest", "llm", "ai-agent", "prompt-injection",
+    "red-team", "owasp-llm", "mcp", "agent-security", "appsec",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Testing",
+]
+
+# One runtime dependency, on purpose. The corpus is YAML because that is the
+# format security people already contribute test cases in; everything else uses
+# the standard library so the kit installs in a locked-down CI image without an
+# egress-approved wheel list.
+dependencies = ["PyYAML>=5.4"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-cov>=4.0"]
+
+[project.scripts]
+sinon = "sinon.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/at0m-b0mb/Sinon"
+Documentation = "https://at0m-b0mb.github.io/Sinon/"
+Source = "https://github.com/at0m-b0mb/Sinon"
+Issues = "https://github.com/at0m-b0mb/Sinon/issues"
+Changelog = "https://github.com/at0m-b0mb/Sinon/blob/main/CHANGELOG.md"
+
+[tool.hatch.version]
+path = "sinon/version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sinon"]
+
+# Ship the corpus inside the package so `pip install sinon-kit` gives you the
+# probes as well as the runner. sinon.corpus.default_corpus_path() looks here
+# first and falls back to the repository layout for a plain git clone.
+[tool.hatch.build.targets.wheel.force-include]
+"corpus" = "sinon/corpus"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/sinon",
+    "/corpus",
+    "/tests",
+    "/docs",
+    "/examples",
+    "/README.md",
+    "/LICENSE",
+    "/CHANGELOG.md",
+    "/SECURITY.md",
+    "/CONTRIBUTING.md",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["error::DeprecationWarning"]
