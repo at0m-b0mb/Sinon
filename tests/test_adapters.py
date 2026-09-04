@@ -201,3 +201,23 @@ def test_cli_adapter_reports_a_missing_command():
     adapter = adapters.build({"kind": "cli", "command": "definitely-not-a-real-binary-xyz"})
     response = adapter.send(AgentRequest(probe_id="P", prompt="hi"))
     assert not response.ok and "command not found" in response.error
+
+
+def test_windows_paths_survive_command_splitting(monkeypatch):
+    """POSIX shlex eats backslashes; a Windows command path must not lose them."""
+    from sinon.adapters import cli as cli_mod
+
+    monkeypatch.setattr(cli_mod.os, "name", "nt")
+    assert cli_mod.split_command(r"C:\Tools\agent.exe --stdin") == [
+        r"C:\Tools\agent.exe", "--stdin"
+    ]
+    assert cli_mod.split_command(r'"C:\Program Files\a b\agent.exe" run') == [
+        r"C:\Program Files\a b\agent.exe", "run"
+    ]
+
+
+def test_posix_command_splitting_is_unchanged(monkeypatch):
+    from sinon.adapters import cli as cli_mod
+
+    monkeypatch.setattr(cli_mod.os, "name", "posix")
+    assert cli_mod.split_command("python3 -c 'import sys'") == ["python3", "-c", "import sys"]

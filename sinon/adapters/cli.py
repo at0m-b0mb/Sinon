@@ -24,6 +24,7 @@ target actually is.
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import subprocess
 import time
@@ -33,6 +34,24 @@ from ..model import AgentRequest, AgentResponse, ToolCall
 from .base import Adapter, AdapterError, ToolRunner, inline_documents
 
 MAX_TOOL_TURNS = 6
+
+
+def split_command(command: str) -> List[str]:
+    """Split a command line into argv, correctly on Windows as well as POSIX.
+
+    ``shlex.split`` defaults to POSIX rules, under which a backslash is an
+    escape character --- so ``C:\\Tools\\agent.exe`` silently becomes
+    ``C:Toolsagent.exe`` and the command is not found. On Windows the split is
+    done in non-POSIX mode, which preserves backslashes, and the quote
+    characters it leaves behind are stripped afterwards.
+    """
+    if os.name != "nt":
+        return shlex.split(command)
+    tokens = shlex.split(command, posix=False)
+    return [
+        token[1:-1] if len(token) > 1 and token[0] == token[-1] and token[0] in "\"'" else token
+        for token in tokens
+    ]
 
 
 class CliAdapter(Adapter):
@@ -55,7 +74,7 @@ class CliAdapter(Adapter):
             raise AdapterError("cli protocol must be 'text' or 'json'")
         super().__init__(name=name or command.split()[0], url="")
         self.command = command
-        self.argv = shlex.split(command)
+        self.argv = split_command(command)
         self.protocol = protocol
         self.timeout = timeout
         self.max_tool_turns = max_tool_turns
