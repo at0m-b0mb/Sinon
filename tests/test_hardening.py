@@ -314,18 +314,25 @@ def test_the_sink_survives_a_malformed_request(sink):
 # No quadratic regexes on attacker-controlled text
 # --------------------------------------------------------------------------
 
-@pytest.mark.parametrize("text", [
-    "A" * 200_000,
-    "-" * 100_000,
-    "S-I-N-O-N-" * 10_000,
-    ("word." * 40_000),
-])
-def test_directive_extraction_is_fast_on_hostile_text(text):
+# Built inside the test, not passed through parametrize: pytest puts the test id
+# into PYTEST_CURRENT_TEST, and Windows refuses an environment variable over
+# 32767 characters, so a 200 KB parameter fails at setup on that platform only.
+HOSTILE_TEXTS = {
+    "alphanumeric-run": lambda: "A" * 200_000,
+    "separator-run": lambda: "-" * 100_000,
+    "near-miss-canary": lambda: "S-I-N-O-N-" * 10_000,
+    "dotted-words": lambda: "word." * 40_000,
+}
+
+
+@pytest.mark.parametrize("shape", sorted(HOSTILE_TEXTS))
+def test_directive_extraction_is_fast_on_hostile_text(shape):
     """A document is attacker-controlled; scanning it must stay linear."""
+    text = HOSTILE_TEXTS[shape]()
     started = time.time()
     extract_directives(text, "content")
     elapsed = time.time() - started
-    assert elapsed < 2.0, f"took {elapsed:.1f}s on {len(text)} chars"
+    assert elapsed < 2.0, f"took {elapsed:.1f}s on {len(text)} chars of {shape}"
 
 
 def test_extraction_still_works_after_the_bounds_were_added():
