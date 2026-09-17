@@ -73,6 +73,24 @@ sinon run --engagement engagement.yaml \
 Header values are expanded from the environment, so `$AGENT_TOKEN` stays out of
 your shell history and out of the report.
 
+### Redirects are not followed
+
+A 3xx from the target is reported as an error naming the destination, and the
+request stops there. This is deliberate. The authorization gate checked the host
+you named; following a redirect would send probe traffic --- and the
+`Authorization` header with it, which urllib forwards across hosts --- to a host
+nobody authorized, with nothing in the report to show it happened.
+
+If the destination is genuinely your target, confirm it is in scope and point
+`--target-url` at it directly.
+
+### Response size
+
+Responses are read up to 8 MB and the truncation is marked in the text. Each
+free-text evidence field in the JSON report is capped separately. A target that
+returns hundreds of megabytes --- hostile or just broken --- should cost you a
+truncated excerpt, not the tester's memory and a multi-gigabyte report.
+
 ### The action trace
 
 Many internal agents already return a trace for their own debugging. Point

@@ -14,12 +14,19 @@ them.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict
 
-from ..model import ProbeResult, RunResult, Verdict, excerpt
+from ..model import ProbeResult, RunResult, excerpt
 from ..scoring import Score, score_run
 
 SCHEMA_VERSION = 1
+
+#: Cap on each free-text evidence field. A hostile or broken target can return
+#: megabytes; copying that verbatim into the report turned one bad reply into a
+#: multi-gigabyte file across a full corpus. Twenty thousand characters is far
+#: more than any oracle needs and the truncation is stated in the output, so the
+#: reader knows they are looking at an excerpt.
+MAX_EVIDENCE_CHARS = 20_000
 
 
 def probe_to_dict(result: ProbeResult, include_response: bool = True) -> Dict[str, Any]:
@@ -73,11 +80,11 @@ def probe_to_dict(result: ProbeResult, include_response: bool = True) -> Dict[st
         data["error"] = result.error
     if include_response:
         data["request"] = {
-            "prompt": result.rendered_prompt,
-            "payload": result.rendered_payload,
+            "prompt": excerpt(result.rendered_prompt, MAX_EVIDENCE_CHARS),
+            "payload": excerpt(result.rendered_payload, MAX_EVIDENCE_CHARS),
         }
         data["response"] = {
-            "text": result.response.text if result.response else "",
+            "text": excerpt(result.response.text if result.response else "", MAX_EVIDENCE_CHARS),
             "latency_ms": round(result.response.latency_ms, 1) if result.response else 0.0,
         }
     return data

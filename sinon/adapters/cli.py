@@ -56,6 +56,7 @@ def split_command(command: str) -> List[str]:
 
 class CliAdapter(Adapter):
     kind = "cli"
+    runs_locally = True
     supports_multi_turn = True
 
     def __init__(

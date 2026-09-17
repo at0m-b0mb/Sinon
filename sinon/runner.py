@@ -25,7 +25,7 @@ from __future__ import annotations
 import datetime as _dt
 import time
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, List, Optional, Sequence
 
 from . import canary as canary_mod
 from . import corpus as corpus_mod
@@ -157,8 +157,27 @@ class Runner:
     # -- one execution ---------------------------------------------------
 
     def _run_once(self, probe: Probe, run_id: str) -> ProbeResult:
-        started = time.time()
+        """Execute one probe, converting any fault into an ERROR verdict.
 
+        One bad probe must not take the run with it. A corpus is a shared,
+        contributed artefact: a probe with an uncompilable regex, a tool name
+        that no longer exists, or a template that blows up should cost that
+        probe and nothing else. Before this wrapper existed, either of those
+        aborted the whole run with a traceback and the operator lost every
+        result gathered so far.
+        """
+        started = time.time()
+        try:
+            return self._execute(probe, run_id, started)
+        except Exception as exc:
+            return ProbeResult(
+                probe=probe,
+                verdict=Verdict.ERROR,
+                error=f"{type(exc).__name__}: {exc}",
+                duration_ms=(time.time() - started) * 1000,
+            )
+
+    def _execute(self, probe: Probe, run_id: str, started: float) -> ProbeResult:
         skip = self._skip_reason(probe)
         if skip:
             return self._skip(probe, skip)
@@ -223,6 +242,9 @@ class Runner:
         try:
             response = self.adapter.send(request, tool_runner=belt.invoke)
         except Exception as exc:  # adapters raise their own types; none should escape
+            # Caught here rather than by the wrapper so the canary and the
+            # rendered prompt survive into the report as evidence of what was
+            # attempted.
             return ProbeResult(
                 probe=probe,
                 verdict=Verdict.ERROR,

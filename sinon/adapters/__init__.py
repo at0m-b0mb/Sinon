@@ -31,7 +31,19 @@ def build(config: Dict[str, Any]) -> Adapter:
     The dict is assembled by the CLI from flags and, where present, the
     ``target:`` block of the engagement file --- so an operator can keep the
     whole target definition next to its authorization and run with one flag.
+
+    Every construction fault surfaces as :class:`AdapterError`, which is what
+    the CLI turns into a usage message. Adapters are free to raise ``ValueError``
+    for a bad argument as a library would; translating it here means a typo in
+    ``--target`` prints one line rather than a traceback.
     """
+    try:
+        return _build(config)
+    except ValueError as exc:
+        raise AdapterError(str(exc)) from exc
+
+
+def _build(config: Dict[str, Any]) -> Adapter:
     kind = str(config.get("kind", "reference")).lower()
 
     if kind == "reference":

@@ -15,6 +15,7 @@ guessed at, and the grade is capped accordingly.
 
 from __future__ import annotations
 
+import copy
 import time
 from typing import Any, Dict, List, Optional
 
@@ -77,7 +78,10 @@ class HttpJsonAdapter(Adapter):
     def send(
         self, request: AgentRequest, tool_runner: Optional[ToolRunner] = None
     ) -> AgentResponse:
-        body: Dict[str, Any] = dict(self.extra_body)
+        # Deep copy: a shallow one shares nested dicts with the template, so
+        # writing a nested --prompt-field mutated the adapter's own body and one
+        # probe's prompt leaked into the next request built from it.
+        body: Dict[str, Any] = copy.deepcopy(self.extra_body)
         set_path(body, self.prompt_field, inline_documents(request))
         if self.system_field and request.system_prompt:
             set_path(body, self.system_field, request.system_prompt)

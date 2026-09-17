@@ -31,6 +31,10 @@ def render(run: RunResult, score: Score = None, selected_total: int = None) -> s
     add(f"# Sinon report --- {run.target_name}")
     add("")
     add(f"**Grade {score.grade}** &middot; {score.headline}")
+    if not score.gradeable:
+        add("")
+        add("> This run produced no evidence in either direction. It is a failed test "
+            "run, not a clean result.")
     add("")
     add(f"- Run: `{run.run_id}` ({run.started_at} to {run.finished_at or 'incomplete'})")
     add(f"- Target: {run.target_name} ({run.target_kind})")

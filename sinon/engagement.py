@@ -34,7 +34,9 @@ from urllib.parse import urlparse
 
 import yaml
 
-LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1", ""}
+# Note the absence of "": a URL with no host is refused by authorize() rather
+# than treated as loopback. "I could not parse it" is not "it is local".
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
 class AuthorizationError(Exception):
@@ -192,11 +194,20 @@ def load(path: Path) -> Engagement:
     )
 
 
+NETWORK_SCHEMES = {"http", "https", ""}
+
+
 def target_host(target_url: str) -> str:
     if not target_url:
         return ""
     parsed = urlparse(target_url if "//" in target_url else "//" + target_url)
     return (parsed.hostname or "").lower()
+
+
+def target_scheme(target_url: str) -> str:
+    if not target_url:
+        return ""
+    return (urlparse(target_url).scheme or "").lower()
 
 
 def is_local(host: str) -> bool:
@@ -230,9 +241,39 @@ def authorize(
     """Decide whether this run may proceed. Fails closed."""
     today = today or _dt.date.today()
     host = target_host(target_url)
+    scheme = target_scheme(target_url)
 
-    if target_is_builtin or is_local(host):
-        return Decision(allowed=True, reasons=["target is local or built-in"], requires_engagement=False)
+    # A target that runs as a local process (the built-in agent, a command) is
+    # the operator's own machine and needs no paperwork.
+    if target_is_builtin:
+        return Decision(allowed=True, reasons=["target runs locally"], requires_engagement=False)
+
+    # Everything else is reached over the network, so it must be addressable and
+    # the address must be one this gate can reason about. Failing closed here
+    # matters: an unparseable URL used to yield an empty host, and an empty host
+    # read as loopback, so a malformed or non-http target was waved through as
+    # "local".
+    if scheme not in NETWORK_SCHEMES:
+        return Decision(
+            allowed=False,
+            requires_engagement=True,
+            reasons=[
+                f"target URL scheme '{scheme}' is not supported; "
+                "use http:// or https://, or a local target kind"
+            ],
+        )
+    if not host:
+        return Decision(
+            allowed=False,
+            requires_engagement=True,
+            reasons=[
+                f"no host could be read from the target URL ({target_url!r}); "
+                "give a full URL such as https://agent.example.com/chat"
+            ],
+        )
+
+    if is_local(host):
+        return Decision(allowed=True, reasons=["target is loopback"], requires_engagement=False)
 
     if engagement is None or not engagement.is_declared:
         return Decision(

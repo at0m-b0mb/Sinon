@@ -14,7 +14,6 @@ every push.
 
 from __future__ import annotations
 
-import os
 import re
 from dataclasses import replace
 from pathlib import Path

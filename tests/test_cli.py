@@ -106,10 +106,22 @@ def test_run_refuses_a_remote_target_without_an_engagement(capsys):
 
 
 def test_run_allows_a_loopback_target_without_an_engagement(capsys):
+    """The gate lets loopback through; whether the endpoint answers is separate."""
     code = run(["run", "--target", "http", "--target-url", "http://127.0.0.1:1/chat",
                 "--id", "PI-DIR-001", "--quiet", "--no-color", "--fail-on", "none"])
-    assert code == EXIT_OK
-    assert "REFUSING" not in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "REFUSING" not in out
+    # Nothing is listening on port 1, so the probe errors. That is a failed run,
+    # not a clean one, and the exit code must say so even with --fail-on none.
+    assert code == EXIT_FINDINGS
+    assert "not gradeable" in out
+
+
+def test_a_run_with_no_evidence_is_never_green(capsys):
+    """CI must not read 'could not look' as 'found nothing'."""
+    code = run(["run", "--target", "http", "--target-url", "http://127.0.0.1:1/chat",
+                "--id", "PI-DIR-001", "--quiet", "--no-color", "--fail-on", "none"])
+    assert code != EXIT_OK
 
 
 def test_run_against_the_reference_target(capsys):

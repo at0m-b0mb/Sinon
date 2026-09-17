@@ -41,9 +41,29 @@ technique classes using synthetic canaries, `evil-example.net` and a loopback
 sink. No malware, no working exploit code, no real credentials, no impersonation
 of a real company or person.
 
+**Redirects are never followed.** The gate validates the host you named. A
+target answering 302 would otherwise move probe traffic, and the `Authorization`
+header urllib forwards with it, to a host that was never authorized --- a scope
+escape and a credential disclosure in one. A 3xx is reported as an error naming
+the destination so you can decide whether it belongs in scope.
+
+**The gate fails closed.** A target URL with no readable host, or a scheme other
+than http/https, is refused rather than assumed local. Adapters declare whether
+they run the target locally instead of that being inferred from a URL.
+
+**The sink cannot be silenced.** Every field of an incoming request is parsed
+defensively and the hit is recorded whatever happens. A malformed
+`Content-Length` used to raise out of the handler and leave the request
+unrecorded, which would have let an agent exfiltrate without evidence.
+
+**Hostile output is bounded.** Responses are capped at 8 MB, evidence fields in
+reports are capped, and the text-scanning patterns are bounded so a large
+document cannot make the run quadratic.
+
 **The tool never claims safety.** The top grade is A, there is no A+, and every
 report states that a pass is the absence of a finding rather than evidence of
-safety.
+safety. A run that produced no evidence is graded `n/a`, never F, and exits
+non-zero so CI cannot read it as clean.
 
 ## What this project will not build
 

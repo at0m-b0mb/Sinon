@@ -18,10 +18,9 @@ expanded content with JavaScript off, because ``<details>`` is HTML, not script.
 from __future__ import annotations
 
 import html as _html
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
-from ..canary import looks_like_canary
-from ..model import Confidence, ProbeResult, RunResult, Severity, Verdict, excerpt
+from ..model import Confidence, ProbeResult, RunResult, Verdict, excerpt
 from ..scoring import Score, score_run
 from ..version import __version__
 from . import brand
@@ -268,6 +267,7 @@ footer {{ margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line)
 # --------------------------------------------------------------------------
 
 _GRADE_COLOR = {
+    "n/a": "var(--muted)",
     "A": "var(--pass)",
     "B": "var(--patina)",
     "C": "var(--medium)",
@@ -299,11 +299,14 @@ def _grade(score: Score) -> str:
         for c in score.ceilings
     )
     ceiling_block = f'<ul class="ceilings">{ceilings}</ul>' if ceilings else ""
+    # A run with no evidence has no score either. Printing "0 / 100" under "n/a"
+    # would reinstate exactly the impression the n/a exists to avoid.
+    subtitle = "no evidence" if not score.gradeable else f"{score.score:.0f} / 100"
     return f"""
 <section class="gradecard" style="--grade-color: {_GRADE_COLOR.get(score.grade, 'var(--ember)')}">
   <div>
     <div class="gradeletter">{_e(score.grade)}</div>
-    <div class="gradescore">{score.score:.0f} / 100</div>
+    <div class="gradescore">{_e(subtitle)}</div>
   </div>
   <div>
     <div class="headline">{_e(score.headline)}</div>

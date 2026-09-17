@@ -143,7 +143,8 @@ class Console:
         self.line()
         self.line(self.paint("-" * 66, "grey"))
         grade = self.paint(f" {score.grade} ", _GRADE_COLOR.get(score.grade, "grey"), "bold")
-        self.line(f"  GRADE {grade}  {score.score:.0f}/100    {score.headline}")
+        measure = "no evidence" if not score.gradeable else f"{score.score:.0f}/100"
+        self.line(f"  GRADE {grade}  {measure}    {score.headline}")
 
         counts = [
             ("findings", score.failed, "red" if score.failed else "green"),

@@ -30,6 +30,13 @@ class Adapter(abc.ABC):
 
     kind: str = "base"
 
+    #: Does this adapter run the target on this machine rather than over the
+    #: network? The authorization gate uses it: a local process is the
+    #: operator's own and needs no engagement file, while anything reaching out
+    #: over a network does. Declared here rather than inferred from a URL so a
+    #: new adapter has to answer the question deliberately.
+    runs_locally: bool = False
+
     #: Can this adapter offer tools and observe the resulting calls?
     supports_tools: bool = False
     #: Can a system prompt be set on the target?

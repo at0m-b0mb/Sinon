@@ -5,6 +5,49 @@ All notable changes to this project are documented here. This project follows
 version (`CORPUS_SCHEMA_VERSION`), bumped only when a change would break an
 existing probe file.
 
+## [1.0.1] — 2026-09-16
+
+A security and robustness pass over the whole codebase. Every item below was
+found by auditing 1.0.0 against hostile input, and each has a regression test.
+
+### Security
+
+- **Redirects are no longer followed.** A target answering 301/302 moved probe
+  traffic to a host the authorization gate never checked, and urllib forwarded
+  the `Authorization` header across that hop — a scope escape and a credential
+  disclosure. A 3xx is now an error naming the destination.
+- **The authorization gate fails closed.** A target URL with no readable host
+  resolved to an empty host, which read as loopback, so a malformed or
+  non-http target (`file:///...`, a bare path) was waved through as "local".
+  Unparseable and non-http targets are now refused, and adapters declare
+  `runs_locally` rather than it being inferred from a URL.
+- **The sink can no longer be silenced.** A malformed `Content-Length` raised
+  out of the request handler and the request went unrecorded, so an agent could
+  exfiltrate leaving no evidence. Every field is now parsed defensively.
+- `--insecure` is recorded in the report and warned about in the banner.
+
+### Correctness
+
+- **A run that produced no evidence is graded `n/a`, not F.** An endpoint that
+  was simply down came back graded F with a headline reading "no findings".
+  Ungradeable runs now exit non-zero even with `--fail-on none`, so CI cannot
+  read "could not look" as "found nothing".
+- **A probe of only `info` severity no longer scores zero.** Weight zero means
+  no exposure, not no result; a clean info-only run scores 100.
+- **One bad probe no longer aborts the run.** An uncompilable oracle regex or an
+  unknown tool name raised through the runner and the operator lost every result
+  gathered so far. Both are now an `ERROR` verdict on that probe alone.
+
+### Robustness
+
+- Responses are capped at 8 MB and report evidence fields at 20,000 characters.
+  A 64 MB reply was buffered whole and copied into the JSON report.
+- The reference agent's email and path patterns were quadratic: 200 KB of text
+  took 56 seconds to scan, now 0.02. Scanning is also capped at 64 KB per blob.
+- The HTTP adapter deep-copies its request template; a nested `--prompt-field`
+  mutated it and leaked one probe's prompt into the next request.
+- Dead imports removed.
+
 ## [1.0.0] — 2026-09-04
 
 First release.
@@ -57,4 +100,5 @@ First release.
 - Requests identifiable by default; suppression requires explicit sign-off and
   is printed in the banner and the report
 
+[1.0.1]: https://github.com/at0m-b0mb/Sinon/releases/tag/v1.0.1
 [1.0.0]: https://github.com/at0m-b0mb/Sinon/releases/tag/v1.0.0

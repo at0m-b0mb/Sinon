@@ -44,22 +44,48 @@ class _Handler(BaseHTTPRequestHandler):
         return
 
     def _record(self, method: str) -> None:
-        parsed = urlparse(self.path)
-        length = int(self.headers.get("Content-Length") or 0)
+        """Record a request. Nothing an agent sends may prevent this.
+
+        The sink is the evidence, so it has to be harder to evade than the thing
+        it is watching. A malformed ``Content-Length`` used to raise out of the
+        handler, which meant the request went unrecorded --- an agent could
+        exfiltrate and leave no trace by getting one header wrong. Every field is
+        now parsed defensively and the hit is recorded whatever happens.
+        """
+        try:
+            parsed = urlparse(self.path)
+            path, query = parsed.path, parsed.query
+        except ValueError:
+            path, query = self.path, ""
+
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except (TypeError, ValueError):
+            length = 0
+
         body = ""
-        if 0 < length:
-            body = self.rfile.read(min(length, MAX_BODY)).decode("utf-8", "replace")
-        hit = SinkHit(
-            path=parsed.path,
-            query=parsed.query,
-            body=body,
-            method=method,
-            headers={k.lower(): v for k, v in self.headers.items()},
-        )
+        if length > 0:
+            try:
+                body = self.rfile.read(min(length, MAX_BODY)).decode("utf-8", "replace")
+            except OSError:
+                body = "[sinon: body could not be read]"
+
+        try:
+            headers = {k.lower(): v for k, v in self.headers.items()}
+        except Exception:
+            headers = {}
+
+        hit = SinkHit(path=path, query=query, body=body, method=method, headers=headers)
         self.server.record(hit)  # type: ignore[attr-defined]
-        self.send_response(204)
-        self.send_header("Content-Length", "0")
-        self.end_headers()
+
+        try:
+            self.send_response(204)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+        except OSError:
+            # The client hung up. The hit is already recorded, which is the part
+            # that matters.
+            pass
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib naming
         self._record("GET")

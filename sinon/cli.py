@@ -22,13 +22,12 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import Any, Dict, List, Optional, Sequence
 
 from . import adapters, corpus as corpus_mod, engagement as engagement_mod, oracles, toolbelt
 from .adapters.base import AdapterError
-from .model import Severity, Verdict
 from .report import brand, console as console_mod, html, json_report, markdown, sarif
-from .runner import Runner, RunOptions, default_system_prompt
+from .runner import Runner, RunOptions
 from .scoring import exit_code, score_run
 from .sink import Sink
 from .version import __version__
@@ -432,7 +431,7 @@ def cmd_run(args) -> int:
         return EXIT_USAGE
 
     decision = engagement_mod.authorize(
-        adapter.url, engagement, target_is_builtin=(adapter.kind == "reference")
+        adapter.url, engagement, target_is_builtin=adapter.runs_locally
     )
     if not decision.allowed:
         cons.line()
@@ -475,6 +474,14 @@ def cmd_run(args) -> int:
                 engagement,
                 sink.url if sink else args.sink_url,
             )
+            if args.insecure:
+                for warning in (
+                    "  WARNING: --insecure. TLS certificates are not being verified.",
+                    "           Probe payloads and any credentials sent to this target",
+                    "           can be read or altered in transit. Recorded in the report.",
+                ):
+                    cons.line(cons.paint(warning, "yellow"))
+                cons.line()
             runner = Runner(adapter, sink=sink, options=options, sink_url_override=args.sink_url)
             progress = None if args.quiet else (lambda r, i, t: cons.probe_line(r, i, t))
             run = runner.run(probes, progress=progress, engagement=engagement)
@@ -487,6 +494,16 @@ def cmd_run(args) -> int:
             f"  dry run: {len(probes)} probe(s) rendered, nothing sent.", "yellow"
         ))
         return EXIT_OK
+
+    if args.insecure:
+        # A reader of the report has to know the transport was unverified; it
+        # changes how much the results can be trusted and whether the client's
+        # traffic was exposed during the engagement.
+        run.notes.append(
+            "TLS certificate verification was disabled for this run (--insecure). "
+            "Traffic to the target was not authenticated and could have been "
+            "observed or modified in transit."
+        )
 
     score = score_run(run, len(probes))
     cons.summary(run, score)

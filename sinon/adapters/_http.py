@@ -17,12 +17,46 @@ from typing import Any, Dict, Optional, Tuple
 DEFAULT_TIMEOUT = 60.0
 USER_AGENT = "Sinon/1.0 (+https://github.com/at0m-b0mb/Sinon)"
 
+# A hostile or simply broken target must not be able to exhaust the tester's
+# memory. Anything past this is discarded and the truncation is reported, which
+# is still plenty of evidence: no oracle needs eight megabytes of reply.
+MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+
 
 class HttpError(Exception):
     def __init__(self, message: str, status: int = 0, body: str = ""):
         super().__init__(message)
         self.status = status
         self.body = body
+
+
+class _NoRedirects(urllib.request.HTTPRedirectHandler):
+    """Refuse to follow redirects.
+
+    This is a security control, not a convenience setting. Sinon's authorization
+    gate checks the host of the URL the operator named; if a target answered 302
+    and urllib chased it, probe traffic --- and the ``Authorization`` header that
+    goes with it --- would reach a host nobody authorized and nobody would see it
+    happen. urllib forwards request headers across hosts on redirect, so this is
+    a credential-disclosure path as well as a scope escape.
+
+    Returning ``None`` stops the chase; the 3xx then surfaces as an HTTPError and
+    :func:`post_json` turns it into a message that names the destination, so the
+    operator can decide whether that host is in scope and point at it directly.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _build_opener(verify_tls: bool) -> urllib.request.OpenerDirector:
+    handlers = [_NoRedirects()]
+    if not verify_tls:
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        handlers.append(urllib.request.HTTPSHandler(context=context))
+    return urllib.request.build_opener(*handlers)
 
 
 def identification_headers(run_id: str, probe_id: str) -> Dict[str, str]:
@@ -59,21 +93,26 @@ def post_json(
     }
     all_headers.update(headers or {})
 
-    context = None
-    if not verify_tls:
-        context = ssl.create_default_context()
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
+    opener = _build_opener(verify_tls)
 
     last_error: Optional[Exception] = None
     for attempt in range(retries + 1):
         request = urllib.request.Request(url, data=body, headers=all_headers, method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=timeout, context=context) as response:
-                raw = response.read().decode("utf-8", "replace")
+            with opener.open(request, timeout=timeout) as response:
+                raw = _read_capped(response)
                 return response.status, _parse(raw)
         except urllib.error.HTTPError as exc:
-            raw = exc.read().decode("utf-8", "replace") if exc.fp else ""
+            if 300 <= exc.code < 400:
+                destination = exc.headers.get("Location", "an undisclosed location") if exc.headers else "?"
+                raise HttpError(
+                    f"HTTP {exc.code} from {url}: the target redirected to {destination}. "
+                    "Sinon does not follow redirects, because the authorization gate "
+                    "checked the host you named and request headers would travel to the "
+                    "new one. Confirm that host is in scope and point --target-url at it.",
+                    exc.code,
+                ) from exc
+            raw = _read_capped(exc) if exc.fp else ""
             if exc.code < 500 or attempt == retries:
                 raise HttpError(f"HTTP {exc.code} from {url}", exc.code, raw) from exc
             last_error = exc
@@ -84,6 +123,17 @@ def post_json(
         time.sleep(0.5 * (2 ** attempt))
 
     raise HttpError(f"could not reach {url}: {last_error}")
+
+
+def _read_capped(response: Any) -> str:
+    """Read a response body, stopping at :data:`MAX_RESPONSE_BYTES`."""
+    raw = response.read(MAX_RESPONSE_BYTES + 1)
+    if len(raw) > MAX_RESPONSE_BYTES:
+        raw = raw[:MAX_RESPONSE_BYTES]
+        return raw.decode("utf-8", "replace") + (
+            f"\n[sinon: response truncated at {MAX_RESPONSE_BYTES} bytes]"
+        )
+    return raw.decode("utf-8", "replace")
 
 
 def _parse(raw: str) -> Any:
