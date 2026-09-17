@@ -24,6 +24,12 @@ found by auditing 1.0.0 against hostile input, and each has a regression test.
 - **The sink can no longer be silenced.** A malformed `Content-Length` raised
   out of the request handler and the request went unrecorded, so an agent could
   exfiltrate leaving no evidence. Every field is now parsed defensively.
+- **Credentials in a target URL are redacted from every output.** A URL like
+  `https://svc:pw@agent.internal/chat` is an ordinary way to reach an internal
+  endpoint, and it was printed verbatim in the banner and copied into the HTML,
+  JSON, Markdown and SARIF reports — the one document most certain to be
+  forwarded. The request still uses the real URL; only the displayed form is
+  redacted, and the host stays visible.
 - `--insecure` is recorded in the report and warned about in the banner.
 
 ### Correctness

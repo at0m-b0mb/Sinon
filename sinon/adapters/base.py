@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import abc
 from typing import Callable, Dict, Optional
+from urllib.parse import urlsplit, urlunsplit
 
 from ..model import AgentRequest, AgentResponse, ToolCall
 
@@ -45,8 +46,11 @@ class Adapter(abc.ABC):
     supports_multi_turn: bool = False
 
     def __init__(self, name: str = "", url: str = "") -> None:
-        self.name = name or self.kind
         self.url = url
+        #: The URL as it is safe to print. ``url`` stays intact for making the
+        #: request and for the authorization gate's host check.
+        self.display_url = redact_url(url)
+        self.name = name or self.display_url or self.kind
 
     @abc.abstractmethod
     def send(
@@ -68,7 +72,7 @@ class Adapter(abc.ABC):
         return {
             "kind": self.kind,
             "name": self.name,
-            "url": self.url,
+            "url": self.display_url,
             "supports_tools": "yes" if self.supports_tools else "no",
         }
 
@@ -81,6 +85,30 @@ class Adapter(abc.ABC):
 
     def __str__(self) -> str:  # pragma: no cover - trivial
         return f"{self.kind}:{self.name}"
+
+
+def redact_url(url: str) -> str:
+    """Strip credentials from a URL before it is shown to anyone.
+
+    ``https://svc:hunter2@agent.internal/chat`` is an ordinary way to reach an
+    internal endpoint, and the URL ends up in the terminal banner, the report
+    header and every export. A pentest report is the one document most certain
+    to be forwarded, so the password does not travel in it.
+
+    The request itself still uses the full URL, and the authorization gate reads
+    the host from it, which ``urlsplit`` gives regardless of userinfo.
+    """
+    if not url or "@" not in url:
+        return url
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return url
+    if not parts.netloc or "@" not in parts.netloc:
+        return url
+    _userinfo, _, hostport = parts.netloc.rpartition("@")
+    return urlunsplit((parts.scheme, f"[redacted]@{hostport}", parts.path,
+                       parts.query, parts.fragment))
 
 
 def inline_documents(request: AgentRequest) -> str:

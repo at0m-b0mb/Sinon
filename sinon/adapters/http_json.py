@@ -56,7 +56,10 @@ class HttpJsonAdapter(Adapter):
     ) -> None:
         if not url:
             raise AdapterError("http adapter requires --target-url")
-        super().__init__(name=name or url, url=url)
+        # Deliberately not `name or url`: the base class falls back to the
+        # redacted URL, so credentials in the endpoint never become the label
+        # printed in the banner and the report header.
+        super().__init__(name=name, url=url)
         self.prompt_field = prompt_field
         self.response_path = response_path
         self.system_field = system_field

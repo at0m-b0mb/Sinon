@@ -342,3 +342,47 @@ def test_a_bad_target_string_is_a_usage_error_not_a_traceback():
 
     with pytest.raises(AdapterError, match="unknown profile"):
         build_adapter({"kind": "reference", "profile": "paranoid"})
+
+
+# --------------------------------------------------------------------------
+# Credentials never reach a document somebody forwards
+# --------------------------------------------------------------------------
+
+CREDENTIALED = "https://svc-account:hunter2SECRET@agent.example.com/api/chat"
+
+
+def test_url_credentials_are_redacted_everywhere_they_are_shown():
+    """Basic-auth-in-URL is ordinary; a report is the most-forwarded document."""
+    import json as _json
+
+    from sinon.report import html as html_report, json_report
+
+    adapter = build_adapter({"kind": "http", "url": CREDENTIALED})
+    run = RunResult(run_id="R", started_at="n",
+                    target_name=adapter.name, target_kind=adapter.kind)
+
+    assert "hunter2SECRET" not in adapter.name
+    assert "hunter2SECRET" not in adapter.display_url
+    assert "hunter2SECRET" not in _json.dumps(adapter.describe())
+    assert "hunter2SECRET" not in json_report.dumps(run, selected_total=0)
+    assert "hunter2SECRET" not in html_report.render(run, selected_total=0)
+    assert "agent.example.com" in adapter.display_url, "the host must still be identifiable"
+
+
+def test_the_real_url_is_kept_for_the_request_and_the_gate():
+    adapter = build_adapter({"kind": "http", "url": CREDENTIALED})
+    assert adapter.url == CREDENTIALED, "requests still need the credentials"
+    assert eng.target_host(adapter.url) == "agent.example.com"
+
+
+@pytest.mark.parametrize("url,expected", [
+    ("https://user:pw@h.test/x", "https://[redacted]@h.test/x"),
+    ("https://token@h.test/x", "https://[redacted]@h.test/x"),
+    ("https://h.test/x", "https://h.test/x"),
+    ("https://h.test/x?q=a@b", "https://h.test/x?q=a@b"),
+    ("", ""),
+])
+def test_redaction_only_touches_userinfo(url, expected):
+    from sinon.adapters.base import redact_url
+
+    assert redact_url(url) == expected
