@@ -143,6 +143,9 @@ def shell(title: str, body: str, active: str, description: str) -> str:
 <meta property="og:title" content="{html.escape(title)}">
 <meta property="og:description" content="{html.escape(description)}">
 <meta property="og:type" content="website">
+<meta property="og:image" content="https://raw.githubusercontent.com/at0m-b0mb/Sinon/main/images/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/at0m-b0mb/Sinon/main/images/social-preview.png">
 <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
 <style>{css()}</style>
 </head>
